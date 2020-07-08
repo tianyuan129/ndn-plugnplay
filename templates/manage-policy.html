@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Manage Policy</title>
+    <link rel="stylesheet" href="../static/css/element-ui.css">
+</head>
+<body>
+<h2>Manage Policy</h2>
+
+<div id="manage_policy">
+
+    <el-form label-position="left" label-width="120px" :model="form">
+
+        <el-form-item label="Service To Invoke">
+            <el-select v-model="form.device_name" placeholder="Select" style="width:75%"
+                       no-data-text="No available devices">
+                <el-option
+                        v-for="item in options"
+                        :key="item.value"
+                        :label="item.label"
+                        :value="item.value">
+                </el-option>
+            </el-select>
+        </el-form-item>
+
+        <el-form-item label="Service Type">
+            <el-radio-group v-model="form.add_policy">
+                <el-radio-button label="true">Allow New Policy</el-radio-button>
+                <el-radio-button label="false">Remove Policy</el-radio-button>
+            </el-radio-group>
+        </el-form-item>
+
+        <el-form-item v-if="form.add_policy == 'true'" label="Data Name">
+            <el-input v-model="form.data_name" style="width:75%"></el-input>
+        </el-form-item>
+
+        <el-form-item v-if="form.add_policy == 'true'" label="Key Name">
+            <el-input v-model="form.key_name" style="width:75%"></el-input>
+        </el-form-item>
+
+        <el-form-item label="Policy Name">
+            <el-input v-model="form.policy_name" style="width:75%"></el-input>
+        </el-form-item>
+
+        <el-form-item>
+            <el-button type="primary" type="primary" size="small" round plain @click="onSubmit">Save
+            </el-button>
+        </el-form-item>
+
+    </el-form>
+</div>
+
+</body>
+</html>
+
+<script src="../static/scripts/vue.js"></script>
+<script src="../static/scripts/element-ui.js"></script>
+<script src="../static/scripts/axios.min.js"></script>
+<script>
+  new Vue({
+    el:'#manage_policy',
+    data(){
+      return{
+        form:{
+          device_name:'',
+          add_policy: 'true',
+          data_name:'',
+          key_name:'',
+          policy_name:''
+        },
+        options: {{device_list | tojson}}
+      }
+     },
+    methods:{
+      onSubmit(){
+          console.log(this.form);
+          axios.post('/exec/manage-policy', {device_name: this.form.device_name,
+                                        add_policy: this.form.add_policy,
+                                        data_name: this.form.data_name,
+                                        key_name: this.form.key_name,
+                                        policy_name: this.form.policy_name},{
+                        headers: {'Content-Type': 'application/json'}
+                        }).then(response=>{
+                           ret = response.data;
+                           if (ret.response_type === 'Timeout'){
+                               txt =  '<div>Response Time: ' + ret.response_time +'</div>' +
+                                      '<div>Response Type: ' + ret.response_type +'</div>' +
+                                      '<div>Name: ' + ret.name + '</div>';
+                               this.$notify({
+                                  title: 'Timeout',
+                                  dangerouslyUseHTMLString: true,
+                                  message: txt,
+                                  type: 'error'
+                               });
+                           }else if (ret.response_type === 'NetworkNack'){
+                                txt = '<div>Response Time: ' + ret.response_time + '</div>' +
+                                      '<div>Response Type: ' + ret.response_type +'</div>' +
+                                      '<div>Name: ' + ret.name +'</div>' +
+                                      '<div>Reason: ' + ret.reason + '</div>';
+                               this.$notify({
+                                  title: 'NetworkNack',
+                                  dangerouslyUseHTMLString: true,
+                                  message: txt,
+                                  type: 'error'
+                               });
+                           }else{
+                                txt = '<div>Response Time: ' + ret.response_time + '</div>' +
+                                      '<div>Response Type: ' + ret.response_type + '</div>' +
+                                      '<div>Name: ' + ret.name + '</div>' +
+                                      '<div>Content: ' + ret.content + '</div>' +
+                                      '<div>Freshness Period: ' + ret.freshness_period + '</div>' +
+                                      '<div>Final Block Id: ' + ret.final_block_id + '</div>';
+                               this.$notify({
+                                  title: 'Success',
+                                  dangerouslyUseHTMLString: true,
+                                  message: txt,
+                                  type: 'success'
+                               });
+                           }
+          });
+      }
+    }
+  })
+
+</script>

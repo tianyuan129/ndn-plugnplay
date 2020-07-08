@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>General Status</title>
+  <link rel="stylesheet" href="../static/css/element-ui.css">
+</head>
+<body>
+  <h2>Device List</h2>
+  <div id="devicelist">
+    <el-table :data="device_list" border stripe empty-text="no device available">
+      <el-table-column prop="device_name" label="Device Identity Name" min-width="2"></el-table-column>
+      <el-table-column prop="device_ip" label="Device IP address" min-width="2"></el-table-column>
+      <el-table-column prop="device_port" label="Device Port" min-width="2"></el-table-column>
+      <el-table-column label="Operation" min-width="1">
+        <template slot-scope="scope">
+        <el-button @click="deleteRow(scope.$index)" type="danger" size="small">remove</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+  </div>
+</body>
+</html>
+
+
+<script src="../static/scripts/vue.js"></script>
+<script src="../static/scripts/element-ui.js"></script>
+<script src="../static/scripts/axios.min.js"></script>
+<script>
+  new Vue({
+    el:'#devicelist',
+    data(){
+      return{
+        device_list:{{device_list | tojson}},
+      }
+     },
+     methods:{
+        deleteRow(index){
+          let vm = this;
+          console.log(this.device_list[index]);
+          axios.post('/delete/device',{device_name:this.device_list[index].device_name},{
+                        headers: {'Content-Type': 'application/json'}
+                        }).then(response=>{
+                          if (response.data.st_code === 200){
+                            this.$notify.success({
+                                title: 'SUCCESS',
+                                message: 'Device deletion succeeded'
+                                });
+                                vm.device_list.splice(index,1)
+                          }else{
+                            this.$notify.error({
+                                  title: 'ERROR',
+                                  message: 'Device deletion failed',
+                               });
+                          }
+
+                        });
+        }
+     }
+  })
+
+</script>
+

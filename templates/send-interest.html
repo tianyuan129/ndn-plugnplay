@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Express an NDN Interest packet</title>
+  <link rel="stylesheet" href="../static/css/element-ui.css">
+
+</head>
+<body>
+<h2>Express an NDN Interest packet</h2>
+
+<div id="ndn_form" >
+<el-form label-position="left" label-width="120px" :model="form">
+  <el-form-item label="Interest Name">
+    <el-input v-model="form.name" style="width:75%"></el-input>
+  </el-form-item>
+  <el-form-item label="Can Be Prefix">
+    <el-switch v-model="form.can_be_prefix"></el-switch>
+  </el-form-item>
+  <el-form-item label="Must Be Fresh">
+    <el-switch v-model="form.must_be_fresh"></el-switch>
+  </el-form-item>
+  <el-form-item label="Signed Interest">
+    <el-switch v-model="form.signed_interest"></el-switch>
+  </el-form-item>
+  <el-form-item label="Interest Lifetime">
+     <el-input v-model="form.interest_lifetime" label="Interest lifetime" style="width:20%"></el-input>
+  </el-form-item>
+  <el-form-item label="App Param">
+     <el-input v-model="form.application_parameter" label="Application Parameter" style="width:75%"></el-input>
+  </el-form-item>
+  <el-form-item>
+    <el-button type="primary" type="primary" size="small" round plain @click="onSubmit">Express Interest</el-button>
+  </el-form-item>
+  </el-form>
+</div>
+
+</body>
+</html>
+
+<script src="../static/scripts/vue.js"></script>
+<script src="../static/scripts/element-ui.js"></script>
+<script src="../static/scripts/axios.min.js"></script>
+<script>
+  new Vue({
+    el:'#ndn_form',
+    data(){
+      return{
+          form: {
+            name: '',
+            can_be_prefix: true,
+            must_be_fresh: true,
+            signed_interest: false,
+            interest_lifetime: 4,
+            application_parameter: ''
+        }
+      }
+     },
+    methods:{
+      onSubmit(){
+          console.log(this.form);
+          axios.post('/exec/send-interest',
+                      {name: this.form.name,
+                       can_be_prefix: this.form.can_be_prefix,
+                       must_be_fresh: this.form.must_be_fresh,
+                       signed_interest: this.form.signed_interest,
+                       interest_lifetime: this.form.interest_lifetime,
+                       application_parameter: this.form.application_parameter},
+                       {
+                        headers: {'Content-Type': 'application/json'}
+                       }).then(response=>{
+                           ret = response.data;
+                           if (ret.response_type === 'Timeout'){
+                               txt =  '<div>Response Time: ' + ret.response_time +'</div>' +
+                                      '<div>Response Type: ' + ret.response_type +'</div>' +
+                                      '<div>Name: ' + ret.name + '</div>';
+                               this.$notify({
+                                  title: 'Timeout',
+                                  dangerouslyUseHTMLString: true,
+                                  message: txt,
+                                  type: 'error'
+                               });
+                           }else if (ret.response_type === 'NetworkNack'){
+                                txt = '<div>Response Time: ' + ret.response_time + '</div>' +
+                                      '<div>Response Type: ' + ret.response_type +'</div>' +
+                                      '<div>Name: ' + ret.name +'</div>' +
+                                      '<div>Reason: ' + ret.reason + '</div>';
+                               this.$notify({
+                                  title: 'NetworkNack',
+                                  dangerouslyUseHTMLString: true,
+                                  message: txt,
+                                  type: 'error'
+                               });
+                           }else{
+                                txt = '<div>Response Time: ' + ret.response_time + '</div>' +
+                                      '<div>Response Type: ' + ret.response_type + '</div>' +
+                                      '<div>Name: ' + ret.name + '</div>' +
+                                      '<div>Content Type: ' + ret.content_type + '</div>' +
+                                      '<div>Freshness Period: ' + ret.freshness_period + '</div>' +
+                                      '<div>Content: ' + ret.content + '</div>';
+                               this.$notify({
+                                  title: 'Success',
+                                  dangerouslyUseHTMLString: true,
+                                  message: txt,
+                                  type: 'success'
+                               });
+                           }
+          });
+      }
+    }
+  })
+</script>

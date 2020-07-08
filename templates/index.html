@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="/static/css/main.css">
+  <script src="/static/scripts/index.js"></script>
+</head>
+
+<body>
+  <div class="container">
+    <div class="menu">
+      <img class="logo" src="static/img/logo.png">
+      <h2 class="title">NDN IoT Controller</h2>
+      <input type="text" id="menu_search" onkeyup="do_menu_search()" placeholder="Search ..." title="Type in a category">
+      <div id="div_menu_items">
+        <input type="button" value="System Overview" onclick="set_content('http://localhost:6060/system-overview')">
+        <input type="button" value="Device Bootstrapping" onclick="set_content('http://localhost:6060/bootstrapping')">
+        <!--<input type="button" value="Room" onclick="set_content('http://localhost:5001/room')">-->
+        <input type="button" value="Device List" onclick="set_content('http://localhost:6060/device-list')">
+        <input type="button" value="Service List" onclick="set_content('http://localhost:6060/service-list')">
+        <input type="button" value="Invoke Service" onclick="set_content('http://localhost:6060/invoke-service')">
+        <input type="button" value="Access Control" onclick="set_content('http://localhost:6060/access-control')">
+        <input type="button" value="Send Interest" onclick="set_content('http://localhost:6060/send-interest')">
+        <input type="button" value="Manage Policy" onclick="set_content('http://localhost:6060/manage-policy')">
+      </div>
+    </div>
+
+    <div class="content">
+      <iframe id="content_frame" height="100%" width="100%" style="border:1px solid gray;" 
+              src="http://localhost:6060/system-overview"></iframe>
+    </div>
+  </div>
+</body>
+
+</html>
