@@ -67,13 +67,13 @@ public:
     }
     freeifaddrs(ifaddr);
   }
-  std::string& getIpAddr() {
+  const std::string& getIpAddr() const {
     return m_ipAddr;
   }
-  std::string& getPort() {
+  const std::string& getPort() const {
     return m_port;
   }
-  std::string& getNetmask() {
+  const std::string& getNetmask() const {
     return m_netmask;
   }
 private:

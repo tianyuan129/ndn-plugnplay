@@ -266,7 +266,6 @@ NDClient::onAddFaceDataReply(const Interest& interest, const Data& data,
 {
   short responseCode;
   char responseText[1000] = {0};
-  char buf[1000]           = {0};   // For parsing
   int faceId;                      // Store faceid for deletion of face
   Block responseBlock = data.getContent().blockFromValue();
   responseBlock.parse();
