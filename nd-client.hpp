@@ -38,7 +38,7 @@ public:
   void registerRoute(const Name& routeName, int faceId,
                      int cost = 0, bool isRvRoute = false);
 
-//   void onSubInterest(const Interest& subInterest);
+  void onRvProbeInterest(const Interest& interest);
   
   void sendArrivalInterest();
 
@@ -77,23 +77,17 @@ public:
 
 public:
   bool is_ready = false;    // Ready after creating face and route to ND server
+  Name m_root;
   Face *m_face;
   KeyChain m_keyChain;
-  Name m_root;
+
   security::v2::Certificate m_cert;
 
   NetworkInfo m_networkInfo;
   std::string m_rvIpAddr;
   int m_rvFaceId;
   
-  Name m_prefix;
-  Name m_server_prefix;
-  in_addr m_IP;
-  in_addr m_submask;
   Scheduler *m_scheduler;
-  in_addr m_server_IP;
-  int m_server_faceid;
-  uint16_t m_port;
   uint8_t m_buffer[4096];
   size_t m_len;
   std::map<std::string, std::string> m_uriToPrefix;

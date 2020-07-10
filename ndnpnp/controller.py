@@ -27,6 +27,7 @@ from .ECDH import ECDH
 
 default_prefix = "ndn-plugnplay"
 default_udp_multi_uri = "udp4://224.0.23.170:56363"
+default_ether_multi_uri = "ether://[01:00:5e:00:17:aa]"
 controller_port = 6363
 
 
@@ -119,6 +120,7 @@ class Controller:
             item.device_name = Name.from_str("/ndn/example")
             item.device_ip = str.encode("192.168.99.123")
             item.device_port = str.encode("5678")
+            item.device_active = str.encode("inactive")
             self.device_list.devices.append(item)
 
     async def iot_connectivity_init(self):
@@ -128,25 +130,29 @@ class Controller:
         """
 
         # Step Three: Configure Face and Route
-        # 1. Find/create NFD's UDP Multicast Face, BLE Multicast Face, etc.
-        # face_id = await query_face_id(self.app, default_udp_multi_uri)
-        # if not face_id:
-        #     logging.fatal("Cannot find existing udp multicast face")
-        #     return
-        # logging.info("Successfully found UDP multicast face: %d", face_id)
-        # # 2. Set up NFD's route from IoT system prefix to multicast faces
-        # ret = await add_route(self.app, self.system_prefix, face_id)
-        # if ret is True:
-        #     logging.info("Successfully add route.")
-        # else:
-        #     logging.fatal("Cannot set up the route for IoT prefix")
-        # # 3. Set up NFD's multicast strategy for IoT system namespace
-        # ret = await set_strategy(self.app, self.system_prefix, "/localhost/nfd/strategy/multicast")
-        # if ret is True:
-        #     logging.info("Successfully add multicast strategy.")
-        #     logging.info("Server finishes the step 3 initialization")
-        # else:
-        #     logging.fatal("Cannot set up the strategy for IoT prefix")
+        # 1. Find/create NFD's multicast Face
+        udp_face_id = await query_face_id(self.app, default_udp_multi_uri)
+        ether_face_id = await query_face_id(self.app, default_ether_multi_uri)
+        if udp_face_id is None and ether_face_id is None:
+            logging.fatal("Cannot find existing multicast face")
+            return
+        # # 2. Set up NFD's route from system prefix to multicast faces
+        if udp_face_id is not None:
+            ret = await add_route(self.app, self.system_prefix, udp_face_id)
+            if ret is True:
+                logging.info("Successfully add udp multicast route.")
+        if ether_face_id is not None:
+            ether_route_success = await add_route(self.app, self.system_prefix, ether_face_id)
+            if ret is True:
+                logging.info("Successfully add ethernet multicast route.")
+
+        # 3. Set up NFD's multicast strategy for system namespace
+        ret = await set_strategy(self.app, self.system_prefix, "/localhost/nfd/strategy/multicast")
+        if ret is True:
+            logging.info("Successfully add multicast strategy.")
+            logging.info("Server finishes the step 3 initialization")
+        else:
+            logging.fatal("Cannot set up the strategy for IoT prefix")
 
         @self.app.route('/ndn/sign-on')
         def on_sign_on_interest(name: FormalName, param: InterestParam, pp_param: Optional[BinaryStr]):
@@ -263,9 +269,11 @@ class Controller:
             await asyncio.sleep(60)
             logging.debug("let's probing")
             for device in self.device_list.devices:
-                # skip example device
-                if Name.to_str(device.device_name) == "/ndn/example":
+                # skip example and inactive device
+                if Name.to_str(device.device_name) == "/ndn/example" or \
+                   bytes(device.device_active).decode() == "inactive":
                     continue
+                
                 # I know it's not the correct way, but what is the correct way?
                 interest_name = Name.from_str(Name.to_str(device.device_name))
                 interest_name.append("nd-info")
@@ -288,14 +296,22 @@ class Controller:
                     if ret['response_type'] == 'NetworkNack':
                         logging.debug(f'Nacked with reason')
                         await asyncio.sleep(1)
-                        n_retries -= 1
+                        n_retries = n_retries - 1
                     if ret['response_type'] == 'Timeout':
                         logging.debug(f'Timeout')
                         await asyncio.sleep(1)
-                        n_retries -= 1
+                        n_retries = n_retries - 1
                 if not is_success:
-                    # remove face and route
+                    # remove face and route, labal as inactive
                     logging.debug("should remove")
+                    device.device_active = str.encode("inactive")
+                    uri = 'udp4://' + bytes(device.device_ip).decode() + ':' + bytes(device.device_port).decode()
+                    face_id = await query_face_id(self.app, uri)
+                    # TODO: replace this with method calls
+                    p = subprocess.run(['nfdc', 'face', 'destroy', str(face_id)], stdout=subprocess.PIPE)
+                    removed = await remove_route(self.app, Name.to_str(device.device_name), face_id)
+                    if not removed:
+                        logging.debug("removal not success")
 
 
 
@@ -366,6 +382,7 @@ class Controller:
         if not already_added:
             device = DeviceItem()
             device.device_name = name_to_register
+            device.device_active = str.encode("inactive")
             self.device_list.devices.append(device)
         
 
@@ -401,6 +418,7 @@ class Controller:
                 logging.debug('device already added, update ip addr and port')
                 device.device_ip = str.encode(device_ip)
                 device.device_port = str.encode(device_port)
+                device.device_active = str.encode("active")
 
                 # setting up face and route
                 uri = 'udp4://' + device_ip + ':' + device_port

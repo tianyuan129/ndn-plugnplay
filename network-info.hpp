@@ -1,3 +1,6 @@
+#ifndef ND_NETWORK_INFO_HPP
+#define ND_NETWORK_INFO_HPP
+
 #include <ndn-cxx/face.hpp>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -80,3 +83,5 @@ private:
 };
 
 }
+
+#endif

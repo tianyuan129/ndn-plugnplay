@@ -39,60 +39,6 @@ public:
 };
 
 
-// class NetworkInfo
-// {
-// public:
-//   NetworkInfo(std::string port = std::to_string(6363))
-//     : m_port(port)
-//   {
-//     struct ifaddrs *ifaddr, *ifa;
-//     int family, s;
-//     char host[NI_MAXHOST];
-//     char netmask[NI_MAXHOST];
-//     if (getifaddrs(&ifaddr) == -1) {
-//         perror("getifaddrs");
-//         exit(EXIT_FAILURE);
-//     }
-
-//     for (ifa = ifaddr; ifa != NULL; ifa = ifa->ifa_next) {
-//       if (ifa->ifa_addr == NULL)
-//         continue;
-
-//       s = getnameinfo(ifa->ifa_addr, sizeof(struct sockaddr_in), host, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-//       s = getnameinfo(ifa->ifa_netmask, sizeof(struct sockaddr_in), netmask, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
-
-//       if (ifa->ifa_addr->sa_family==AF_INET) {
-//         if (s != 0) {
-//           printf("getnameinfo() failed: %s\n", gai_strerror(s));
-//           exit(EXIT_FAILURE);
-//         }
-//         if (ifa->ifa_name[0] == 'l' && ifa->ifa_name[1] == 'o')   // Loopback
-//           continue;
-//         printf("\tInterface : <%s>\n", ifa->ifa_name);
-//         printf("\t  Address : <%s>\n", host);
-        
-//         m_ip_addr = host;
-//         m_netmask = netmask;
-//         break;
-//       }
-//     }
-//     freeifaddrs(ifaddr);
-//   }
-//   std::string getIpAddr() {
-//     return m_ip_addr;
-//   }
-//   std::string getPort() {
-//     return m_port;
-//   }
-//   std::string getNetmask() {
-//     return m_netmask;
-//   }
-// private:
-//   std::string m_ip_addr;
-//   std::string m_port;
-//   std::string m_netmask;
-// };
-
 class BootstrapClient{
 public:
   BootstrapClient(const Name& flatID)
@@ -127,49 +73,6 @@ public:
                                      bind(&BootstrapClient::onNack, this, _1, _2),
                                      bind(&BootstrapClient::onCertReqTimeout, this, _1));
   }
-
-
-  // void sendArrivalInterest()
-  // {
-  //   Name name(m_root);
-  //   name.append("nd").append("arrival").append(std::to_string(m_cert.getIdentity().size())).append(m_cert.getIdentity())
-  //       .append(m_networkinfo.getIpAddr()).append(m_networkinfo.getPort())
-  //       .appendTimestamp();
-
-  //   Interest interest(name);
-  //   interest.setInterestLifetime(10_s);
-  //   interest.setMustBeFresh(true);
-  //   interest.setNonce(4);
-  //   interest.setCanBePrefix(false); 
-
-  //   std::cout << "NDND (Client): Arrival Interest: " << interest << std::endl;
-
-  //   m_face.expressInterest(interest, bind(&BootstrapClient::onArrivalAck, this, _1, _2), 
-  //                                    bind(&BootstrapClient::onNack, this, _1, _2),
-  //                                    bind(&BootstrapClient::onArrivalTimeout, this, _1)); //no expectation
-  // }
-
-
-  // void sendNeighborDiscoveryInterest()
-  // {
-  //   Name name(m_root);
-  //   name.append("nd").append("nd-info").appendTimestamp();
-
-  //   Interest interest(name);
-  //   interest.setInterestLifetime(10_s);
-  //   interest.setMustBeFresh(true);
-  //   interest.setNonce(4);
-  //   interest.setCanBePrefix(false); 
-
-  //   std::cout << "NDND (Client): Info Interest: " << interest << std::endl;
-
-  //   m_face.expressInterest(interest, bind(&BootstrapClient::onNeighborDiscoveryData, this, _1, _2), 
-  //                                    bind(&BootstrapClient::onNack, this, _1, _2),
-  //                                    bind(&BootstrapClient::onNeighborDiscoveryTimeout, this, _1)); //no expectation
-  // }
-
-
-
 
 private:
   void onSignOnRes(const Interest& interest, const Data& data)
@@ -214,60 +117,6 @@ private:
     m_ndClient = new nd::NDClient(m_root, m_cert, &m_face);
     m_ndClient->sendArrivalInterest();
   }
-  // void onArrivalAck(const Interest& interest, const Data& data)
-  // {
-  //   std::cout << data << std::endl;
-  //   sendNeighborDiscoveryInterest();
-  // }
-
-
-  // void onNeighborDiscoveryData(const Interest& interest, const Data& data)
-  // {
-  //   std::cout << data << std::endl;
-
-  //   Block payload(data.getContent().value(), data.getContent().value_size());
-  //   payload.parse();
-  //   std::cout << "Output Block: " << payload << std::endl;
-  //   if (payload.type() != nd::tlv::NeighborInfo)
-  //     std::cout << "wrong start: " << payload.type() << std::endl;
-
-  //     // Param
-  //     Block::element_const_iterator val = payload.find(nd::tlv::NeighborParameter);
-  //     // now are name + ip + port
-
-  //     // Name
-  //     while(val != payload.elements_end())
-  //     {
-  //       Block param = *val;
-  //       param.parse();
-  //       std::cout << "Output Block: " << param << std::endl;
-  //       Block::element_const_iterator param_val = param.find(tlv::Name);
-  //       if (param_val != param.elements_end())
-  //       {
-  //         Name neighbor_name;
-  //         neighbor_name.wireDecode(param.get(tlv::Name));
-  //         std::cout << neighbor_name << std::endl;
-  //       }
-  //       // Ip
-  //       param_val = param.find(nd::tlv::NeighborIpAddr);
-  //       if (param_val != param.elements_end())
-  //       {
-  //         std::string ip_str = readString(*param_val);
-  //         std::cout << ip_str << std::endl;
-  //       }
-  //       // Port
-  //       param_val = param.find(nd::tlv::NeighborPort);
-  //       if (val != param.elements_end())
-  //       {
-  //         std::string port = readString(*param_val);
-  //         std::cout << port << std::endl;
-  //       }
-
-  //       payload.erase(val);
-  //       val = payload.find(nd::tlv::NeighborParameter);
-  //     }
-  // }
-
 
 
   void onNack(const Interest& interest, const lp::Nack& nack)
@@ -288,18 +137,6 @@ private:
     sendCertReq();
   }
   
-  // void onArrivalTimeout(const Interest& interest)
-  // {
-  //   std::cout << "Timeout " << interest << std::endl;
-  //   sendArrivalInterest();
-  // }
-
-  // void onNeighborDiscoveryTimeout(const Interest& interest)
-  // {
-  //   std::cout << "Timeout " << interest << std::endl;
-  //   sendNeighborDiscoveryInterest(); 
-  // }
-
 public:
   bool is_ready = false;    // Ready after creating face and route to ND server
 

@@ -15,6 +15,7 @@
 
 #include "nd-tlv.hpp"
 #include "nfdc-helpers.h"
+#include "nd-param.hpp"
 #include "nd-client.hpp"
 
 namespace ndn{
@@ -64,30 +65,20 @@ NDClient::registerRoute(const Name& routeName, int faceId, int cost, bool isRvRo
                                    bind(&NDClient::onTimeout, this, _1));
 }
 
-// void
-// NDClient::onSubInterest(const Interest& subInterest)
-//   {
-//     // reply data with IP confirmation
-//     Buffer contentBuf;
-//     for (int i = 0; i < sizeof(m_IP); i++) {
-//       contentBuf.push_back(*((uint8_t*)&m_IP + i));
-//     }
+void
+NDClient::onRvProbeInterest(const Interest& interest)
+{
+  NDParam neighborParam(m_networkInfo);
+  neighborParam.setName(m_cert.getIdentity());
 
-//     auto data = make_shared<Data>(subInterest.getName());
-//     if (contentBuf.size() > 0) {
-//       data->setContent(contentBuf.get<uint8_t>(), contentBuf.size());
-//     }
-//     else {
-//       return;
-//     }
-
-//     m_keyChain.sign(*data, security::SigningInfo(security::SigningInfo::SIGNER_TYPE_SHA256));
-//     // security::SigningInfo signInfo(security::SigningInfo::SIGNER_TYPE_ID, m_options.identity);
-//     // m_keyChain.sign(*m_data, signInfo);
-//     data->setFreshnessPeriod(time::milliseconds(4000));
-//     m_face->put(*data);
-//     cout << "NDND (Client): Publishing Data: " << *data << endl;
-// }
+  Data result;
+  result.setName(interest.getName());
+  result.setContent(neighborParam.wireEncode());
+  result.setFreshnessPeriod(time::milliseconds(4000));
+  m_keyChain.sign(result, signingByCertificate(m_cert));
+  m_face->put(result);
+  std::cout << "reply probe with data: " << result << std::endl;
+}
 
 void  
 NDClient::sendArrivalInterest()
@@ -117,14 +108,6 @@ NDClient::sendArrivalInterest()
                                     bind(&NDClient::onNack, this, _1, _2),
                                     bind(&NDClient::onArrivalTimeout, this, _1)); //no expectation
 }
-// void
-// NDClient::registerSubPrefix()
-//   {
-//     Name name(m_prefix);
-//     name.append("nd-info");
-//     m_face->setInterestFilter(InterestFilter(name), bind(&NDClient::onSubInterest, this, _2), nullptr);
-//     cout << "NDND (Client): Register Prefix: " << name << endl;
-//   }
 
 void
 NDClient::sendNeighborDiscoveryInterest()
@@ -144,8 +127,8 @@ NDClient::sendNeighborDiscoveryInterest()
   std::cout << "Info Interest: " << interest << std::endl;
 
   m_face->expressInterest(interest, bind(&NDClient::onNeighborDiscoveryData, this, _1, _2), 
-                                   bind(&NDClient::onNack, this, _1, _2),
-                                   bind(&NDClient::onNeighborDiscoveryTimeout, this, _1)); //no expectation
+                                    bind(&NDClient::onNack, this, _1, _2),
+                                    bind(&NDClient::onNeighborDiscoveryTimeout, this, _1)); //no expectation
 }
 
 // private:
@@ -153,6 +136,9 @@ void
 NDClient::onArrivalAck(const Interest& interest, const Data& data)
 {
   std::cout << data << std::endl;
+  Name name(m_cert.getIdentity());
+  name.append("nd-info");
+  m_face->setInterestFilter(InterestFilter(name), bind(&NDClient::onRvProbeInterest, this, _2), nullptr);
   sendNeighborDiscoveryInterest();
 }
 
@@ -169,40 +155,18 @@ NDClient::onNeighborDiscoveryData(const Interest& interest, const Data& data)
 
   // Param
   Block::element_const_iterator infoVal = neighborInfo.find(nd::tlv::NeighborParameter);
-  // now are name + ip + port
 
-  // Name
+  // Parse all neighbor parameters till the end
   while(infoVal != neighborInfo.elements_end())
   {
-    Block paramList = *infoVal;
-    std::string ipParam, portParam;
     Name nameParam;
-    paramList.parse();
-    std::cout << "Output Block: " << paramList << std::endl;
-    Block::element_const_iterator paramVal = paramList.find(ndn::tlv::Name);
-    if (paramVal != paramList.elements_end())
-    {
-      nameParam.wireDecode(paramList.get(ndn::tlv::Name));
-      std::cout << nameParam << std::endl;
-    }
-    // Ip
-    paramVal = paramList.find(nd::tlv::NeighborIpAddr);
-    if (paramVal != paramList.elements_end())
-    {
-      ipParam = readString(*paramVal);
-      std::cout << ipParam << std::endl;
-    }
-    // Port
-    paramVal = paramList.find(nd::tlv::NeighborPort);
-    if (paramVal != paramList.elements_end())
-    {
-      portParam = readString(*paramVal);
-      std::cout << portParam << std::endl;
-    }
-
+    std::string ipParam, portParam;
+    NDParam neighborParam(*infoVal);
+    nameParam = neighborParam.getName();
+    ipParam = neighborParam.getIpAddr();
+    portParam = neighborParam.getPort();
     neighborInfo.erase(infoVal);
     infoVal = neighborInfo.find(nd::tlv::NeighborParameter);
-
 
     // add face and route
     if (ipParam == m_networkInfo.getIpAddr())

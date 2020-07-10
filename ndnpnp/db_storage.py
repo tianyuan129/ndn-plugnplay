@@ -5,6 +5,7 @@ class DeviceItem(TlvModel):
     device_name = NameField()
     device_ip = BytesField(1)
     device_port = BytesField(2)
+    device_active = BytesField(3)
 
 
 class DeviceList(TlvModel):

@@ -2,8 +2,8 @@ import asyncio
 import time
 import os
 import logging
-from ndniot.controller import Controller
-from ndniot.db_storage import *
+from ndnpnp.controller import Controller
+from ndnpnp.db_storage import *
 from ndn.encoding import Name
 from PIL import Image
 from pyzbar.pyzbar import decode
