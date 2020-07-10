@@ -68,11 +68,13 @@ def app_main():
             if device.device_ip == None or device.device_port == None:
                 ret.append({'device_name': Name.to_str(device.device_name),
                             'device_ip': 'empty',
-                            'device_port': 'empty'})
+                            'device_port': 'empty',
+                            'device_activeness': bytes(device.device_active).decode()})
             else:              
                 ret.append({'device_name': Name.to_str(device.device_name),
                             'device_ip': bytes(device.device_ip).decode(),
-                            'device_port': bytes(device.device_port).decode()})
+                            'device_port': bytes(device.device_port).decode(),
+                            'device_activeness': bytes(device.device_active).decode()})
         return {'device_list': ret}
 
     @routes.post('/delete/device')

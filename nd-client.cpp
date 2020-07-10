@@ -34,6 +34,9 @@ NDClient::NDClient(const Name& rootPrefix,
   m_scheduler = new Scheduler(m_face->getIoService());
   is_ready = false;
 
+  // set to multicast strategy
+  setStrategy("/", MULTICAST);
+  setStrategy(m_root.toUri(), MULTICAST);
   // Bootstrap face and route to server
   std::stringstream ss;
   ss << "udp4://" << m_rvIpAddr << ':' << "6363";
@@ -179,7 +182,7 @@ NDClient::onNeighborDiscoveryData(const Interest& interest, const Data& data)
     ss << "udp4://" << ipParam << ':' << portParam;
     m_uriToPrefix[ss.str()] = nameParam.toUri();
     addFace(ss.str());
-    setStrategy(nameParam.toUri(), BEST_ROUTE);
+    setStrategy(nameParam.toUri(), MULTICAST);
   }
 }
 void

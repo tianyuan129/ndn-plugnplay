@@ -12,6 +12,7 @@
       <el-table-column prop="device_name" label="Device Identity Name" min-width="2"></el-table-column>
       <el-table-column prop="device_ip" label="Device IP address" min-width="2"></el-table-column>
       <el-table-column prop="device_port" label="Device Port" min-width="2"></el-table-column>
+      <el-table-column prop="device_activeness" label="Device Activity" min-width="2"></el-table-column>
       <el-table-column label="Operation" min-width="1">
         <template slot-scope="scope">
         <el-button @click="deleteRow(scope.$index)" type="danger" size="small">remove</el-button>

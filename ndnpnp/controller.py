@@ -22,8 +22,7 @@ from ndn.types import InterestNack, InterestTimeout
 
 from .db_storage import *
 from .controller_helper import *
-from .ndn_lite_protocols import *
-from .ECDH import ECDH
+from .pnp_protocols import *
 
 default_prefix = "ndn-plugnplay"
 default_udp_multi_uri = "udp4://224.0.23.170:56363"
@@ -33,7 +32,7 @@ controller_port = 6363
 
 class Controller:
     """
-    NDN IoT Controller.
+    NDN PnP Controller.
 
     :ivar app: the python-ndn app
     :ivar system_prefix: a string representing the home namespace
@@ -123,7 +122,7 @@ class Controller:
             item.device_active = str.encode("inactive")
             self.device_list.devices.append(item)
 
-    async def iot_connectivity_init(self):
+    async def connectivity_init(self):
         """
         Init the system in terms of:
         Step 3: Configure network interface, forwarding strategy, and route
@@ -152,7 +151,7 @@ class Controller:
             logging.info("Successfully add multicast strategy.")
             logging.info("Server finishes the step 3 initialization")
         else:
-            logging.fatal("Cannot set up the strategy for IoT prefix")
+            logging.fatal("Cannot set up the strategy for system prefix")
 
         @self.app.route('/ndn/sign-on')
         def on_sign_on_interest(name: FormalName, param: InterestParam, pp_param: Optional[BinaryStr]):
@@ -267,7 +266,7 @@ class Controller:
         """
         while True:
             await asyncio.sleep(60)
-            logging.debug("let's probing")
+            logging.debug("let's probe")
             for device in self.device_list.devices:
                 # skip example and inactive device
                 if Name.to_str(device.device_name) == "/ndn/example" or \
@@ -284,13 +283,17 @@ class Controller:
                 while n_retries > 0:
                     logging.debug(f'sending interest: {Name.to_str(interest_name)}')
                     ret = await self.express_interest(interest_name, None, True, False, False)
-                    if ret['response_type'] == 'Data' and ret.has_key('content'):
-                        # validate content
-                        device_received_param = NeighborParam()
-                        device_received_param.parse(bytes(ret['content']))
-                        logging.debug(Name.to_str(device_received_param.device_name))
-                        logging.debug(str(device_received_param.ip_addr))
-                        logging.debug(str(device_received_param.port))
+                    if ret['response_type'] == 'Data' and ret['content'] is not None:
+                        # update record
+                        neighbor_param_bytes = parse_and_check_tl(bytes(ret['content']), TLV_NEIGHBOR_PARAM)
+                        neighbor_param = NeighborParam.parse(neighbor_param_bytes)
+                        # name as validation given it won't change
+                        if Name.to_str(neighbor_param.name) != Name.to_str(device.device_name):
+                            logging.debug("name not correct, force remove")
+                            break
+                        # update other elements
+                        device.device_ip = neighbor_param.ip_addr
+                        device.device_port = neighbor_param.port
                         is_success = True
                         break
                     if ret['response_type'] == 'NetworkNack':
@@ -386,7 +389,7 @@ class Controller:
             self.device_list.devices.append(device)
         
 
-        # only for test: delete identity
+        # only for local test: delete identity
         # device_key = self.app.keychain.del_identity(Name.to_str(device_name))
         # register it back to root prefix
         self.app.keychain.set_default_identity(self.system_prefix)
@@ -479,7 +482,7 @@ class Controller:
         logging.info("Restarting app...")
         while True:
             try:
-                await self.app.main_loop(self.iot_connectivity_init())
+                await self.app.main_loop(self.connectivity_init())
             except KeyboardInterrupt:
                 logging.info('Receiving Ctrl+C, shutdown')
                 break

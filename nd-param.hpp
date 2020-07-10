@@ -53,7 +53,9 @@ public:
     : m_hasFields(ND_PARAM_UBOUND),
       m_ipAddr(networkInfo.getIpAddr()),
       m_port(networkInfo.getPort())
-  { 
+  {
+    m_hasFields[ND_PARAM_IPADDR] = true;
+    m_hasFields[ND_PARAM_PORT] = true;
   }
 
   explicit

@@ -18,9 +18,6 @@
 namespace ndn{
 namespace nd{
 
-
-
-
 class NDClient{
 public:
   NDClient(const Name& rootPrefix, 
