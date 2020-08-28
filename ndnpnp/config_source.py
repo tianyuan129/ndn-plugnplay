@@ -247,7 +247,7 @@ class ConfigSource:
         N times timeout will remove face and route
         """
         while True:
-            await asyncio.sleep(6)
+            await asyncio.sleep(6000)
             logging.debug("let's probe")
             for device in self.device_list.devices:
                 # skip example and inactive device
