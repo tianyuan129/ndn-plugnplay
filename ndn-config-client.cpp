@@ -212,6 +212,8 @@ private:
       std::cout << "same host: pass" << std::endl;
     }
     m_cert = cert;
+    auto identity = m_keyChain.getPib().getIdentity(cert.getIdentity());
+    m_keyChain.setDefaultIdentity(identity);
     sendConfigSchemaReq();
   }
 
