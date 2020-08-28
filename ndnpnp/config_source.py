@@ -21,18 +21,18 @@ from ndn.app import NDNApp
 from ndn.types import InterestNack, InterestTimeout
 
 from .db_storage import *
-from .controller_helper import *
+from .config_source_helper import *
 from .pnp_protocols import *
 
 default_prefix = "ndn-plugnplay"
 default_udp_multi_uri = "udp4://224.0.23.170:56363"
 default_ether_multi_uri = "ether://[01:00:5e:00:17:aa]"
-controller_port = 6363
+config_source_port = 6363
 
 
-class Controller:
+class ConfigSource:
     """
-    NDN PnP Controller.
+    NDN PnP config_source.
 
     :ivar app: the python-ndn app
     :ivar system_prefix: a string representing the home namespace
@@ -153,30 +153,43 @@ class Controller:
         else:
             logging.fatal("Cannot set up the strategy for system prefix")
 
-        @self.app.route('/ndn/sign-on')
-        def on_sign_on_interest(name: FormalName, param: InterestParam, pp_param: Optional[BinaryStr]):
+        @self.app.route('/ndn/config')
+        def on_config_interest(name: FormalName, param: InterestParam, pp_param: Optional[BinaryStr]):
             """
-            OnInterest callback when there is a security bootstrapping request
+            OnInterest callback when there is a config Interest: /ndn/config/<nonce>
 
             :param name: Interest packet name
             :param param: Interest parameters
             :app_param: Interest application paramters
             """
 
-            self.process_sign_on_request(name)
+            self.process_config_request(name)
 
         await asyncio.sleep(0.01)
 
         @self.app.route(self.system_prefix + '/cert')
         def on_cert_request_interest(name: FormalName, param: InterestParam, app_param: Optional[BinaryStr]):
             """
-            OnInterest callback when there is a certificate request during bootstrapping
+            OnInterest callback when there is a certificate request during config
 
             :param name: Interest packet name
             :param param: Interest parameters
             :app_param: Interest application paramters
             """
             self.process_cert_request(name, app_param)
+
+        await asyncio.sleep(0.01)
+
+        @self.app.route(self.system_prefix + '/schema')
+        def on_schema_request_interest(name: FormalName, param: InterestParam, app_param: Optional[BinaryStr]):
+            """
+            OnInterest callback when there is a trust schema request during config
+
+            :param name: Interest packet name
+            :param param: Interest parameters
+            :app_param: Interest application paramters
+            """
+            self.process_schema_request(name, app_param)
 
         await asyncio.sleep(0.1)
 
@@ -225,37 +238,6 @@ class Controller:
 
         await asyncio.sleep(0.01)
 
-        @self.app.route([self.system_prefix, bytearray(b'\x08\x01\x02'), bytearray(b'\x08\x01\x00')])
-        def on_sd_ctl_interest(name: FormalName, param: InterestParam, app_param: Optional[BinaryStr]):
-            """
-            OnInterest callback when device want to query the existing services in the system
-
-            :param name: Interest packet name
-            :param param: Interest parameters
-            :app_param: Interest application paramters
-            """
-            logging.info("Service query from device")
-            if app_param is None:
-                logging.error("Malformed Interest")
-                return
-            interested_ids = {sid for sid in app_param}
-            result = b''
-            cur_time = self.get_time_now_ms()
-            for service in self.service_list.services:
-                if service.service_id not in interested_ids:
-                    continue
-                if service.exp_time > cur_time:
-                    result += Name.encode(service.service_name)
-                    result += struct.pack("i", service.exp_time - cur_time)
-
-            if len(result) > 0:
-                self.app.put_data(name, result, freshness_period=3000, identity=self.system_prefix)
-                logging.debug("Replied service data back to the device")
-            else:
-                logging.debug("Don't have services needed by the device, won't reply")
-
-        await asyncio.sleep(0.01)
-
         # then begin probe
         asyncio.ensure_future(self.probe_all_face())
 
@@ -265,7 +247,7 @@ class Controller:
         N times timeout will remove face and route
         """
         while True:
-            await asyncio.sleep(60)
+            await asyncio.sleep(6)
             logging.debug("let's probe")
             for device in self.device_list.devices:
                 # skip example and inactive device
@@ -282,7 +264,7 @@ class Controller:
                 is_success = False
                 while n_retries > 0:
                     logging.debug(f'sending interest: {Name.to_str(interest_name)}')
-                    ret = await self.express_interest(interest_name, None, True, False, False)
+                    ret = await self.express_interest(interest_name, None, True, False, True)
                     if ret['response_type'] == 'Data' and ret['content'] is not None:
                         # update record
                         neighbor_param_bytes = parse_and_check_tl(bytes(ret['content']), TLV_NEIGHBOR_PARAM)
@@ -318,9 +300,9 @@ class Controller:
 
 
 
-    def process_sign_on_request(self, name):
+    def process_config_request(self, name):
         """
-        Process device's sign on request.
+        Process device's config request.
 
         :param name: Interest packet name
         """
@@ -338,29 +320,30 @@ class Controller:
 
     def process_cert_request(self, name, app_param):
         logging.info("[CERT REQ]: interest received")
+        # /ndn-plugnplay/cert/<nonce>
         logging.info(name)
 
-        # anchor signed certificate
         # create identity and key for the device
-        # TODO Remove hardcoded livingroom and ask user for which room the device belongs to
-        device_name = [self.system_prefix, name[-2]]
-        device_key = self.app.keychain.touch_identity(Name.to_str(device_name)).default_key()
+        session = Name.to_str([name[-1]])[1:]
+        device_name = Name.to_str(self.system_prefix) + '/device-' + session
+
+        # generate a random device name: /ndn-plugnplay/device-<nonce>
+        device_key = self.app.keychain.touch_identity(device_name).default_key()
         
-        logging.info(Name.to_str(device_name))
-        p = subprocess.run(['ndnsec-sign-req', Name.to_str(device_name)], stdout=subprocess.PIPE)
+        logging.info(device_name)
+        p = subprocess.run(['ndnsec-sign-req', device_name], stdout=subprocess.PIPE)
         wire = base64.b64decode(p.stdout)
         logging.debug('result from ndnsec-sign-req')
         logging.debug(wire)
 
-        session = gen_nonce()
-        reqname = 'session-' + str(session) + '.req'
-        certname = 'session-' + str(session) + '.cert'
+        reqname = 'session-' + session + '.req'
+        certname = 'session-' + session + '.cert'
         subprocess.run(['touch', reqname, certname], stdout=subprocess.PIPE)
 
         # write cert requst
         with open(reqname, 'wb') as f:  
             f.write(p.stdout)
-        p = subprocess.run(['ndnsec-cert-gen', '-s', Name.to_str(self.system_prefix), '-i', 'controller', reqname], stdout=subprocess.PIPE)
+        p = subprocess.run(['ndnsec-cert-gen', '-s', Name.to_str(self.system_prefix), '-i', 'config-source', reqname], stdout=subprocess.PIPE)
         # write anchor signed cert
         with open(certname, 'wb') as f:  
             f.write(p.stdout)
@@ -370,7 +353,7 @@ class Controller:
         subprocess.run(['rm', reqname, certname], stdout=subprocess.PIPE)
 
         # export to safebag
-        p = subprocess.run(['ndnsec-export', Name.to_str(device_name), '-P', '1234'], stdout=subprocess.PIPE)
+        p = subprocess.run(['ndnsec-export', device_name, '-P', '1234'], stdout=subprocess.PIPE)
         wire = base64.b64decode(p.stdout)
         logging.debug('result from ndnsec-export')
         logging.debug(wire)
@@ -387,13 +370,27 @@ class Controller:
             device.device_name = name_to_register
             device.device_active = str.encode("inactive")
             self.device_list.devices.append(device)
-        
 
         # only for local test: delete identity
-        # device_key = self.app.keychain.del_identity(Name.to_str(device_name))
+        device_key = self.app.keychain.del_identity(Name.to_str(device_name))
         # register it back to root prefix
         self.app.keychain.set_default_identity(self.system_prefix)
         self.app.put_data(name, wire, freshness_period=3000, identity = self.system_prefix)
+
+    def process_schema_request(self, name, app_param):
+        logging.info("[SCHEMA]: interest received")
+        logging.info(name)
+
+        # /ndn-plugnplay/schema/<nonce>
+        #TODO: check such device exist or not
+        file_path = 'ndnpnp/pnp.conf'
+        if not os.path.exists(file_path):
+            logging.error(f'file {file_path} does not exist')
+        with open(file_path, 'rb') as binary_file:
+            b_array = bytearray(binary_file.read())
+        if len(b_array) == 0:
+            logging.warning("File is empty")
+        self.app.put_data(name, b_array, freshness_period=3000, identity = self.system_prefix)
 
     async def process_nd_arrival(self, name: FormalName, app_param: Optional[BinaryStr]):
         """
@@ -436,22 +433,36 @@ class Controller:
         # arrival ack
         self.app.put_data(name, Name.to_bytes(name_to_register), freshness_period=3000, identity = self.system_prefix)
 
-    async def manage_policy_add(self, device_name: str, data_name: str, key_name: str, policy_name: str):
-        interest_name = Name.from_str(device_name)
-        interest_name.insert(1, 'POLICY')
-        interest_name = interest_name + Name.from_str(policy_name)
-        param = PolicyAddRequest()
-        param.data_name = data_name.encode()
-        param.key_name = key_name.encode()
-        time1 = time.time()
-        ret = await self.express_interest(interest_name, param.encode(), True, True, True)
-        time2 = time.time()
-        logging.debug(F'******Policy Update Round Trip Time: {time2 - time1}s******')
-        return ret
+    async def verify_device_ecdsa_signature(self, name: FormalName, sig: SignaturePtrs) -> bool:
+        sig_info = sig.signature_info
+        covered_part = sig.signature_covered_part
+        sig_value = sig.signature_value_buf
+        if not sig_info or sig_info.signature_type != SignatureType.SHA256_WITH_ECDSA:
+            return False
+        if not covered_part or not sig_value:
+            return False
+        identity = Name.to_str(sig_info.key_locator.name[:2])
+        logging.debug(identity)
+        key_bits = None
+        try:
+            key_bits = self.app.keychain.get(identity).default_key().key_bits
+        except (KeyError, AttributeError):
+            logging.error('Cannot find pub key from keychain')
+            return False
+        pk = ECC.import_key(key_bits)
+        verifier = DSS.new(pk, 'fips-186-3', 'der')
+        sha256_hash = SHA256.new()
+        for blk in covered_part:
+            sha256_hash.update(blk)
+        logging.debug(bytes(sig_value))
+        logging.debug(len(bytes(sig_value)))
+        try:
+            verifier.verify(sha256_hash, bytes(sig_value))
+        except ValueError:
+            return False
+        return True
 
-    async def manage_policy_remove(self, policy_to_del):
-        pass
-
+    
     async def express_interest(self, name, app_param, be_fresh: bool, be_prefix: bool, need_sig: bool):
         ret = {'name': Name.to_str(name)}
         try:
@@ -459,7 +470,8 @@ class Controller:
                 data_name, meta_info, content = await self.app.express_interest(name, app_param,
                                                                                 must_be_fresh=be_fresh,
                                                                                 can_be_prefix=be_prefix,
-                                                                                identity=self.system_prefix)
+                                                                                identity=self.system_prefix,
+                                                                                validator=self.verify_device_ecdsa_signature)
             else:
                 data_name, meta_info, content = await self.app.express_interest(name, app_param,
                                                                                 must_be_fresh=be_fresh,

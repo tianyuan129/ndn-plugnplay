@@ -2,7 +2,7 @@ import asyncio
 import time
 import os
 import logging
-from ndnpnp.controller import Controller
+from ndnpnp.config_source import ConfigSource
 from ndnpnp.db_storage import *
 from ndn.encoding import Name
 from PIL import Image
@@ -28,11 +28,11 @@ def app_main():
     aiohttp_jinja2.setup(app, loader=jinja2.FileSystemLoader(os.path.join(base_path, 'templates')))
     app.router.add_static(prefix='/static', path=os.path.join(base_path, 'static'))
     routes = web.RouteTableDef()
-    # Create SocketIO async server for controller
+    # Create SocketIO async server for config_source
     sio = socketio.AsyncServer(async_mode='aiohttp')
     sio.attach(app)
-    controller = Controller(sio.emit)
-    controller.system_init()
+    config_source = ConfigSource(sio.emit)
+    config_source.system_init()
 
     def render_template(template_name, request, **kwargs):
         return aiohttp_jinja2.render_template(template_name, request, context=kwargs)
@@ -55,8 +55,8 @@ def app_main():
     @aiohttp_jinja2.template('system-overview.html')
     async def system_overview(request):
         metainfo = []
-        metainfo.append({"information":"System Prefix", "value": controller.system_prefix})
-        metainfo.append({"information": "Available Devices", "value": str(len(controller.device_list.devices))})
+        metainfo.append({"information":"System Prefix", "value": config_source.system_prefix})
+        metainfo.append({"information": "Available Devices", "value": str(len(config_source.device_list.devices))})
         return {'metainfo': metainfo}
 
     # device list
@@ -64,7 +64,7 @@ def app_main():
     @aiohttp_jinja2.template('device-list.html')
     async def device_list(request):
         ret = []
-        for device in controller.device_list.devices:
+        for device in config_source.device_list.devices:
             if device.device_ip == None or device.device_port == None:
                 ret.append({'device_name': Name.to_str(device.device_name),
                             'device_ip': 'empty',
@@ -83,12 +83,12 @@ def app_main():
         # delete from keychain
         try:
             # TODO bring this line back when the identity delete bug is fixed
-            # controller.app.keychain.del_identity(data['deviceIdentityName'])
+            # config_source.app.keychain.del_identity(data['deviceIdentityName'])
             os.system('ndnsec-delete ' + data['device_name'])
         except KeyError:
             pass  # great, the key has already been removed
         # delete from database
-        controller.device_list.devices = [device for device in controller.device_list.devices
+        config_source.device_list.devices = [device for device in config_source.device_list.devices
                                           if Name.to_str(device.device_name) != data['device_name']]
         return web.json_response({"st_code": 200})
 
@@ -107,7 +107,7 @@ def app_main():
         param = r_json['application_parameter']
 
         st_time = time.time()
-        ret = await controller.express_interest(name, param.encode(), must_be_fresh, can_be_prefix, signed_interest)
+        ret = await config_source.express_interest(name, param.encode(), must_be_fresh, can_be_prefix, signed_interest)
         ed_time = time.time()
 
         response_time = '{:.3f}s'.format(ed_time - st_time)
@@ -120,7 +120,7 @@ def app_main():
     async def manage_policy(request):
         ret = []
         logging.debug('/invoke-service response')
-        for device in controller.device_list.devices:
+        for device in config_source.device_list.devices:
             ret.append({'value': Name.to_str(device.device_name), 'label': Name.to_str(device.device_name)})
         return {'device_list': ret}
 
@@ -135,9 +135,9 @@ def app_main():
 
         st_time = time.time()
         if add_policy:
-            ret = await controller.manage_policy_add(device_name, data_name, key_name, policy_name)
+            ret = await config_source.manage_policy_add(device_name, data_name, key_name, policy_name)
         else:
-            ret = await controller.manage_policy_remove(device_name, policy_name)
+            ret = await config_source.manage_policy_remove(device_name, policy_name)
         ed_time = time.time()
 
         response_time = '{:.3f}s'.format(ed_time - st_time)
@@ -146,11 +146,11 @@ def app_main():
         return web.json_response(ret)
 
     app.add_routes(routes)
-    asyncio.ensure_future(controller.run())
+    asyncio.ensure_future(config_source.run())
     try:
         web.run_app(app, port=6060)
     finally:
-        controller.save_db()
+        config_source.save_db()
 
 if __name__ == '__main__':
     app_main()
