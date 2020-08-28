@@ -2,7 +2,7 @@ CXX = g++
 CXXFLAGS = -std=c++14 -Wall `pkg-config --cflags libndn-cxx` -g
 LIBS = `pkg-config --libs libndn-cxx`
 DESTDIR ?= /usr/local
-SOURCE_OBJS = config-client.o
+SOURCE_OBJS = ndn-config-client.o
 PROGRAMS = ndn-config-client
 
 all: $(PROGRAMS)
@@ -11,7 +11,7 @@ all: $(PROGRAMS)
 	$(CXX) $(CXXFLAGS) -o $@ -c $< $(LIBS)
 
 ndn-config-client: $(SOURCE_OBJS)
-	$(CXX) $(CXXFLAGS) -o $@ config-client.o $(LIBS)
+	$(CXX) $(CXXFLAGS) -o $@ ndn-config-client.o $(LIBS)
 
 clean:
 	rm -f $(PROGRAMS) *.o

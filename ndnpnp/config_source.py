@@ -153,7 +153,7 @@ class ConfigSource:
         else:
             logging.fatal("Cannot set up the strategy for system prefix")
 
-        @self.app.route('/ndn/config')
+        @self.app.route('/ndn/config/anchor')
         def on_config_interest(name: FormalName, param: InterestParam, pp_param: Optional[BinaryStr]):
             """
             OnInterest callback when there is a config Interest: /ndn/config/<nonce>
@@ -167,7 +167,7 @@ class ConfigSource:
 
         await asyncio.sleep(0.01)
 
-        @self.app.route(self.system_prefix + '/cert')
+        @self.app.route('/ndn/config/cert')
         def on_cert_request_interest(name: FormalName, param: InterestParam, app_param: Optional[BinaryStr]):
             """
             OnInterest callback when there is a certificate request during config
@@ -180,7 +180,7 @@ class ConfigSource:
 
         await asyncio.sleep(0.01)
 
-        @self.app.route(self.system_prefix + '/schema')
+        @self.app.route('/ndn/config/schema')
         def on_schema_request_interest(name: FormalName, param: InterestParam, app_param: Optional[BinaryStr]):
             """
             OnInterest callback when there is a trust schema request during config
@@ -320,7 +320,7 @@ class ConfigSource:
 
     def process_cert_request(self, name, app_param):
         logging.info("[CERT REQ]: interest received")
-        # /ndn-plugnplay/cert/<nonce>
+        # /ndn/config/cert/<nonce>
         logging.info(name)
 
         # create identity and key for the device
@@ -349,6 +349,10 @@ class ConfigSource:
             f.write(p.stdout)
         # install this cert
         p = subprocess.run(['ndnsec-cert-install', certname], stdout=subprocess.PIPE)
+
+        # register it back to root prefix
+        self.app.keychain.set_default_identity(self.system_prefix)
+
         # delete session file
         subprocess.run(['rm', reqname, certname], stdout=subprocess.PIPE)
 
@@ -372,9 +376,7 @@ class ConfigSource:
             self.device_list.devices.append(device)
 
         # only for local test: delete identity
-        device_key = self.app.keychain.del_identity(Name.to_str(device_name))
-        # register it back to root prefix
-        self.app.keychain.set_default_identity(self.system_prefix)
+        # device_key = self.app.keychain.del_identity(Name.to_str(device_name))
         self.app.put_data(name, wire, freshness_period=3000, identity = self.system_prefix)
 
     def process_schema_request(self, name, app_param):

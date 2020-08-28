@@ -11,6 +11,6 @@ venv/
 .vscode/
 
 # Output Files
-config-client
+ndn-config-client
 pnp.conf
 pnp-trust-anchor.cert
