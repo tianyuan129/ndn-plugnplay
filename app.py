@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import time
 import os
@@ -19,6 +20,15 @@ int_to_service_mapping = {
 }
 
 def app_main():
+    parser = argparse.ArgumentParser(description='system prefix')
+    parser.add_argument('--prefix',
+                        required=False, default='ndn-plugnplay',
+                        help='prefix of the system')
+    parser.add_argument('--convention',
+                        required=False, default='device',
+                        help='device naming convention: /<system-prefix>/<input>-<nonce>')
+    args = parser.parse_args()
+
     logging.basicConfig(format='[{asctime}]{levelname}:{message}', datefmt='%Y-%m-%d %H:%M:%S',
                         level=logging.DEBUG, style='{')
 
@@ -31,7 +41,7 @@ def app_main():
     # Create SocketIO async server for config_source
     sio = socketio.AsyncServer(async_mode='aiohttp')
     sio.attach(app)
-    config_source = ConfigSource(sio.emit)
+    config_source = ConfigSource(sio.emit, prefix = args.prefix, convention = args.convention)
     config_source.system_init()
 
     def render_template(template_name, request, **kwargs):

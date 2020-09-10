@@ -43,7 +43,7 @@ class ConfigSource:
     :ivar shared_secret_list: the list of already-shared secrets
     """
 
-    def __init__(self, emit_func):
+    def __init__(self, emit_func, **kwargs):
         self.newly_pub_command = None
         self.newly_pub_payload = None
         self.wait_fetch_cmd_event = None
@@ -59,6 +59,9 @@ class ConfigSource:
         self.system_anchor = None
         self.db = None
         self.device_list = DeviceList()
+
+        self.input_prefix = kwargs['prefix']
+        self.input_convention = kwargs['convention']
 
     def save_db(self):
         """
@@ -93,8 +96,10 @@ class ConfigSource:
             logging.info('Found system prefix from db')
             self.system_prefix = ret.decode()
         else:
-            self.system_prefix = default_prefix
-            self.db.put(b'system_prefix', default_prefix.encode())
+            #self.system_prefix = default_prefix
+            self.system_prefix = self.input_prefix
+            #self.db.put(b'system_prefix', default_prefix.encode())
+            self.db.put(b'system_prefix', self.system_prefix.encode())
         # 2. get system root anchor certificate and private key (from keychain)
         anchor_identity = self.app.keychain.touch_identity(self.system_prefix)
         anchor_key = anchor_identity.default_key()
@@ -325,7 +330,8 @@ class ConfigSource:
 
         # create identity and key for the device
         session = Name.to_str([name[-1]])[1:]
-        device_name = Name.to_str(self.system_prefix) + '/device-' + session
+        # device_name = Name.to_str(self.system_prefix) + '/device-' + session
+        device_name = Name.to_str(self.system_prefix) + '/' + self.input_convention + '-' + session
 
         # generate a random device name: /ndn-plugnplay/device-<nonce>
         device_key = self.app.keychain.touch_identity(device_name).default_key()
