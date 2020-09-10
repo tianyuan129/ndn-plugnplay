@@ -91,15 +91,17 @@ class ConfigSource:
         if not os.path.exists(db_dir):
             os.makedirs(db_dir)
         self.db = plyvel.DB(db_dir, create_if_missing=True)
-        ret = self.db.get(b'system_prefix')
-        if ret:
-            logging.info('Found system prefix from db')
-            self.system_prefix = ret.decode()
-        else:
-            #self.system_prefix = default_prefix
-            self.system_prefix = self.input_prefix
-            #self.db.put(b'system_prefix', default_prefix.encode())
-            self.db.put(b'system_prefix', self.system_prefix.encode())
+        # Read system prefix from db
+        # ret = self.db.get(b'system_prefix')
+        # if ret:
+        #     logging.info('Found system prefix from db')
+        #     self.system_prefix = ret.decode()
+        # else:
+        #     #self.system_prefix = default_prefix
+        #     self.system_prefix = self.input_prefix
+        #     #self.db.put(b'system_prefix', default_prefix.encode())
+        #     self.db.put(b'system_prefix', self.system_prefix.encode())
+        self.system_prefix = self.input_prefix
         # 2. get system root anchor certificate and private key (from keychain)
         anchor_identity = self.app.keychain.touch_identity(self.system_prefix)
         anchor_key = anchor_identity.default_key()
